@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>猜歌遊戲 — 網頁版</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#111827; --muted:#9ca3af; --accent:#6366f1; --success:#16a34a; --danger:#ef4444;
+      color-scheme: dark;
+    }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Helvetica Neue",Arial;}
+    body{margin:0; background:linear-gradient(180deg,var(--bg),#071025); color:#eef2ff; min-height:100vh; padding:20px;}
+    .wrap{max-width:980px;margin:0 auto;}
+    header{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:18px}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:0;color:var(--muted)}
+    .card{background:rgba(255,255,255,0.03); padding:14px;border-radius:12px;margin-bottom:12px; box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .col{flex:1; min-width:200px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{background:var(--card);color:inherit;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.primary{background:linear-gradient(90deg,var(--accent),#4f46e5);border:none}
+    input[type="range"]{width:100%}
+    .upload{border:2px dashed rgba(255,255,255,0.06);padding:18px;border-radius:10px;text-align:center;cursor:pointer}
+    .files{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+    .tag{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px;font-size:13px}
+    .options-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}
+    .opt-btn{padding:10px;border-radius:10px;text-align:left;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);cursor:pointer}
+    .info{font-size:13px;color:var(--muted);margin-top:8px}
+    .message{padding:10px;border-radius:10px;margin-top:10px}
+    .msg-correct{background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.18);color:var(--success)}
+    .msg-wrong{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.12);color:var(--danger)}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    input[type="text"]{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;width:100%}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    .small{font-size:13px;color:var(--muted)}
+    .stats{display:flex;gap:8px;align-items:center}
+    .chip{padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:13px}
+    .timer{font-size:16px;color:#e4e4e4;margin-top:10px;text-align:center;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>猜歌遊戲 · Guess The Song</h1>
+        <p class="lead">上傳音檔 → 播放片段 → 猜歌名（選擇題 / 填答題）</p>
+      </div>
+      <div class="stats">
+        <div class="chip">回合 <span id="round">0</span></div>
+        <div class="chip">分數 <span id="score">0</span></div>
+        <div class="chip">連擊 <span id="streak">0</span></div>
+      </div>
+    </header>
+
+    <!-- upload -->
+    <div class="card">
+      <div id="drop" class="upload" tabindex="0">
+        拖曳音檔到此或點擊選擇（支援 mp3/m4a/wav）。建議檔名格式：Artist - Title.mp3
+        <div style="margin-top:8px">
+          <input id="fileInput" type="file" accept="audio/*" multiple style="display:none" />
+          <button id="pickBtn">選擇檔案</button>
+        </div>
+      </div>
+      <div class="files" id="fileList"></div>
+    </div>
+
+    <!-- settings -->
+    <div class="row">
+      <div class="card col">
+        <label>遊戲模式</label>
+        <div class="controls">
+          <button id="modeChoice" class="primary">選擇題</button>
+          <button id="modeInput">填答題</button>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>片段長度：<span id="clipLabel">7</span> 秒</label>
+          <input id="clipRange" type="range" min="1" max="30" value="7" />
+          <label style="margin-top:8px"><input id="randomStart" type="checkbox" checked /> 隨機起點</label>
+        </div>
+      </div>
+
+      <div class="card col">
+        <label>選項數（選擇題）: <span id="optCountLabel">4</span></label>
+        <input id="optCount" type="range" min="2" max="6" value="4" />
+        <div style="margin-top:10px">
+          <label>可重播次數：<span id="replayLabel">2</span></label>
+          <input id="replayRange" type="range" min="0" max="5" value="2" />
+        </div>
+      </div>
+
+      <div class="card col">
+        <label>快速操作</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="playBtn" class="primary" disabled>播放片段</button>
+          <button id="stopBtn">停止</button>
+          <button id="skipBtn">換一題（不計分）</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- game area -->
+    <div class="card" id="game" aria-live="polite">
+      <div id="questionArea">
+        <!-- options or input will render here -->
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button id="revealBtn">公布解答</button>
+        <button id="nextBtn" class="primary">下一題（計分）</button>
+        <div class="small" style="margin-left:auto">剩餘重播：<span id="replaysLeft">0</span></div>
+      </div>
+
+      <div id="msg" class="message" style="display:none"></div>
+
+      <div class="info" style="margin-top:10px">
+        目標歌曲：<span id="currentInfo">—</span>
+      </div>
+
+      <div class="timer">
+        時間剩餘：<span id="timer">00:00</span>
+      </div>
+    </div>
+
+    <footer>
+      <div class="small">說明：把多首音檔拖曳或選擇上傳 → 按播放片段聽前幾秒（或隨機位置）→ 在選擇題點選或在填答題輸入歌名（不分大小寫）</div>
+    </footer>
+  </div>
+
+<script>
+/* ======= 基本資料結構和工具函式 ======= */
+const state = {
+  songs: [],
+  usedIds: [],
+  current: null,
+  mode: 'choice',   // choice | input
+  clipSeconds: 7,
+  randomStart: true,
+  optCount: 4,
+  allowReplays: 2,
+  replaysLeft: 2,
+  round: 0,
+  score: 0,
+  streak: 0,
+  answerState: 'idle',
+  timer: 0,          // 倒數計時器
+  timerInterval: null // 計時器ID
+};
+const audio = new Audio();
+audio.preload = 'auto';
+let stopTimer = null;
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function parseName(fileName){
+  const name = fileName.replace(/\.[^/.]+$/, '');
+  if(name.includes(' - ')){
+    const [a,b] = name.split(' - ');
+    const looksTitle = s => /[\u4e00-\u9fff\s]/.test(s) || s.length >= a.length;
+    return looksTitle(b) ? {artist:a.trim(), title:b.trim()} : {artist:b.trim(), title:a.trim()};
+  }
+  return {title:name.trim()};
+}
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]] } return arr; }
+function pickRandom(arr,n){ return shuffle([...arr]).slice(0,Math.min(n,arr.length)); }
+
+/* ======= DOM ======= */
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const pickBtn = document.getElementById('pickBtn');
+const fileList = document.getElementById('fileList');
+const playBtn = document.getElementById('playBtn');
+const stopBtn = document.getElementById('stopBtn');
+const skipBtn = document.getElementById('skipBtn');
+const revealBtn = document.getElementById('revealBtn');
+const nextBtn = document.getElementById('nextBtn');
+const questionArea = document.getElementById('questionArea');
+const msgBox = document.getElementById('msg');
+const currentInfo = document.getElementById('currentInfo');
+const roundEl = document.getElementById('round');
+const scoreEl = document.getElementById('score');
+const streakEl = document.getElementById('streak');
+const replaysLeftEl = document.getElementById('replaysLeft');
+const timerEl = document.getElementById('timer');
+
+const modeChoiceBtn = document.getElementById('modeChoice');
+const modeInputBtn = document.getElementById('modeInput');
+const clipRange = document.getElementById('clipRange');
+const clipLabel = document.getElementById('clipLabel');
+const randomStartCb = document.getElementById('randomStart');
+const optCount = document.getElementById('optCount');
+const optCountLabel = document.getElementById('optCountLabel');
+const replayRange = document.getElementById('replayRange');
+const replayLabel = document.getElementById('replayLabel');
+
+/* ======= 上傳處理 ======= */
+drop.addEventListener('click', ()=> fileInput.click());
+pickBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+;['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor='#6d28d9'}));
+;['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor=''; }));
+drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+
+function handleFiles(files){
+  if(!files || files.length===0) return;
+  for(const f of files){
+    if(!f.type.startsWith('audio')) continue;
+    const {title, artist} = parseName(f.name);
+    const url = URL.createObjectURL(f);
+    const song = { id: uid(), title: title||f.name, artist, url, fileName: f.name, duration: null };
+    state.songs.push(song);
+    // try load duration
+    const a = new Audio(url);
+    a.addEventListener('loadedmetadata', ()=> {
+      const s = state.songs.find(x=>x.url===url);
+      if(s) s.duration = a.duration;
+    });
+  }
+  renderFileTags();
+  if(state.songs.length >= Math.max(2, state.optCount)) prepareRound();
+}
+
+function renderFileTags(){
+  fileList.innerHTML = '';
+  state.songs.forEach(s => {
+    const el = document.createElement('span');
+    el.className='tag';
+    el.textContent = s.artist ? (s.artist + ' - ' + s.title) : s.title;
+    fileList.appendChild(el);
+  });
+}
+
+/* ======= 設定控件 ======= */
+modeChoiceBtn.addEventListener('click', ()=> setMode('choice'));
+modeInputBtn.addEventListener('click', ()=> setMode('input'));
+clipRange.addEventListener('input', ()=> { state.clipSeconds = +clipRange.value; clipLabel.textContent = clipRange.value; });
+randomStartCb.addEventListener('change', ()=> state.randomStart = randomStartCb.checked);
+optCount.addEventListener('input', ()=> { state.optCount = +optCount.value; optCountLabel.textContent = optCount.value; });
+replayRange.addEventListener('input', ()=> { state.allowReplays = +replayRange.value; replayLabel.textContent = replayRange.value; state.replaysLeft = state.allowReplays; renderStats(); });
+
+function setMode(m){
+  state.mode = m;
+  if(m==='choice'){ modeChoiceBtn.classList.add('primary'); modeInputBtn.classList.remove('primary'); }
+  else { modeInputBtn.classList.add('primary'); modeChoiceBtn.classList.remove('primary'); }
+  prepareRound();
+}
+
+/* ======= 遊戲邏輯 ======= */
+function canPlay(){ return state.songs.length >= Math.max(2, state.optCount); }
+
+function prepareRound(){
+  if(!canPlay()) {
+    questionArea.innerHTML = '<div class="small">請至少上傳 ' + Math.max(2,state.optCount) + ' 首歌曲才能開始。</div>';
+    return;
+  }
+  // pick unused if possible
+  let pool = state.songs.filter(s => !state.usedIds.includes(s.id));
+  if(pool.length === 0) { state.usedIds = []; pool = state.songs.slice(); }
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  state.current = target;
+  state.answerState = 'idle';
+  state.replaysLeft = state.allowReplays;
+  state.round += 1;
+  renderStats();
+  renderQuestion(); // creates options or input area
+  audio.src = target.url;
+  currentInfo.textContent = '—'; // hide real title until reveal (but we display for debug sometimes)
+  msgBox.style.display='none';
+  startTimer(); // 開始倒數計時
+}
+
+function renderQuestion(){
+  questionArea.innerHTML = '';
+  if(state.mode === 'choice'){
+    // prepare options
+    const others = state.songs.filter(s => s.id !== state.current.id).map(s=>s.title);
+    const distractors = pickRandom(others, state.optCount - 1);
+    const opts = shuffle([ state.current.title, ...distractors ]);
+    const grid = document.createElement('div');
+    grid.className = 'options-grid';
+    opts.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'opt-btn';
+      b.textContent = opt;
+      b.addEventListener('click', ()=> answerWith(opt, grid));
+      grid.appendChild(b);
+    });
+    questionArea.appendChild(grid);
+  } else {
+    const wrap = document.createElement('div');
+    wrap.style.display='flex';
+    wrap.style.gap='8px';
+    wrap.style.marginTop='8px';
+    const input = document.createElement('input');
+    input.type='text';
+    input.placeholder='輸入歌曲名稱（不分大小寫）';
+    input.style.flex='1';
+    const submit = document.createElement('button');
+    submit.textContent = '送出答案';
+    submit.addEventListener('click', ()=> answerWith(input.value));
+    input.addEventListener('keydown', (e)=> {
+      if(e.key==='Enter') submit.click();
+    });
+    wrap.appendChild(input);
+    wrap.appendChild(submit);
+    questionArea.appendChild(wrap);
+  }
+}
+
+function startTimer(){
+  const endTime = Date.now() + state.clipSeconds * 1000;
+  stopTimer = setInterval(() => {
+    const remaining = Math.max(0, endTime - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    timerEl.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    if (remaining <= 0) {
+      clearInterval(stopTimer);
+      answerWith(null);  // automatically submit answer when time's up
+    }
+  }, 1000);
+}
+
+/* ======= 回答處理 ======= */
+function answerWith(answer, optionsGrid = null){
+  clearInterval(stopTimer);  // stop the timer once the answer is submitted
+  
+  let correct = state.current.title.toLowerCase().trim();
+  let isCorrect = false;
+  if(state.mode === 'choice') {
+    if(answer && answer.toLowerCase().trim() === correct) isCorrect = true;
+  } else if(state.mode === 'input') {
+    if(answer && answer.toLowerCase().trim() === correct) isCorrect = true;
+  }
+
+  renderResult(isCorrect, optionsGrid);
+}
+
+function renderResult(isCorrect, optionsGrid = null){
+  if(isCorrect) {
+    scoreEl.textContent = parseInt(scoreEl.textContent) + 10; 
+    msgBox.textContent = "答對了！";
+    msgBox.classList.add('msg-correct');
+  } else {
+    msgBox.textContent = "答錯了！";
+    msgBox.classList.add('msg-wrong');
+  }
+
+  msgBox.style.display = 'block';
+  if(optionsGrid) {
+    Array.from(optionsGrid.children).forEach(btn => {
+      const isOptionCorrect = btn.textContent.toLowerCase().trim() === state.current.title.toLowerCase();
+      btn.style.backgroundColor = isOptionCorrect ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+      btn.disabled = true;
+    });
+  }
+
+  setTimeout(() => {
+    prepareRound();
+    msgBox.style.display = 'none';
+  }, 2000);
+}
+
+function renderStats(){
+  roundEl.textContent = state.round;
+  scoreEl.textContent = state.score;
+  streakEl.textContent = state.streak;
+  replaysLeftEl.textContent = state.replaysLeft;
+}
+
+</script>
+</body>
+</html>
